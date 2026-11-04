@@ -3,9 +3,10 @@ import type { FormEvent } from 'react'
 import {
   ArrowDown, ArrowRight, Bell, Bookmark, Check, ChevronDown, Compass, Flame,
   Heart, Home, ImagePlus, LogOut, MapPin, Menu, MessageCircle, MoreHorizontal,
-  Music2, Search, Send, Sparkles, Sun, Users, X,
+  Music2, Search, Send, Sparkles, Store, Sun, Users, X,
 } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
+import Marketplace from './Marketplace'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 
 type Post = {
@@ -56,6 +57,7 @@ const people = [
 const navItems = [
   { label: 'Home', icon: Home },
   { label: 'Explore', icon: Compass },
+  { label: 'Marketplace', icon: Store },
   { label: 'Communities', icon: Users },
   { label: 'Saved', icon: Bookmark },
 ]
@@ -228,6 +230,9 @@ export default function App() {
         </aside>
 
         <main className="feed-column">
+          {activeNav === 'Marketplace' ? (
+            <Marketplace user={user} search={search} onNotice={setNotice} onSignIn={() => setAuthOpen(true)} />
+          ) : (<>
           <section className="welcome-banner">
             <div className="banner-art" aria-hidden="true"><div className="banner-sun" /><div className="banner-hill hill-back" /><div className="banner-hill hill-front" /><span className="banner-palm">♣</span></div>
             <div className="banner-copy">
@@ -292,6 +297,7 @@ export default function App() {
             {visiblePosts.length === 0 && <div className="empty-state card"><span>🌴</span><h3>{activeNav === 'Saved' ? 'Your saved posts live here' : 'It’s quiet on this side of the island.'}</h3><p>{activeNav === 'Saved' ? 'Save a post to keep it close.' : 'Try a different search, or be the first to share something.'}</p></div>}
           </div>
           <div className="end-of-feed"><span>✳</span> You’re all caught up <span>✳</span></div>
+          </>)}
         </main>
 
         <aside className="right-sidebar">

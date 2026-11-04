@@ -42,3 +42,7 @@ npm run preview
 ```
 
 Deploy the generated `dist/` directory to a static host and configure the same two public Supabase environment variables in the host settings.
+
+## Marketplace
+
+The **Marketplace** tab lets members open a vendor shop (one per account), list products priced in JMD, and be contacted by buyers via WhatsApp. Filter by category, parish, or search. Run `supabase/migrations/20261104010000_marketplace.sql` after the initial migration. The `verified` badge can only be set by an admin in the Supabase dashboard.
