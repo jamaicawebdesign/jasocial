@@ -6,7 +6,7 @@ A Jamaica-rooted social community for sharing island life, finding your people, 
 
 - Responsive community feed with search, topic filters, post likes, and demo content
 - Supabase email magic-link authentication
-- Persistent posts and likes, with row-level security
+- Persistent posts, likes, comments, and private saved posts, with row-level security
 - Profile creation when a new account is created
 - Jamaican community-inspired design for desktop and mobile
 
@@ -46,3 +46,7 @@ Deploy the generated `dist/` directory to a static host and configure the same t
 ## Marketplace
 
 The **Marketplace** tab lets members open a vendor shop (one per account), list products priced in JMD, and be contacted by buyers via WhatsApp. Filter by category, parish, or search. Run `supabase/migrations/20261104010000_marketplace.sql` after the initial migration. The `verified` badge can only be set by an admin in the Supabase dashboard.
+
+## Comments and saved posts
+
+Run `supabase/migrations/20261104020000_comments_and_saves.sql` to enable post comments and the private **Saved** collection.

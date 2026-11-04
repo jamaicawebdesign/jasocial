@@ -6,8 +6,11 @@ import {
   Music2, Search, Send, Sparkles, Store, Sun, Users, X,
 } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
+import Comments from './Comments'
 import Marketplace from './Marketplace'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
+
+const POST_SELECT = 'id, content, created_at, user_id, profiles(username, display_name, avatar_url), likes:post_likes(user_id), saves:post_saves(user_id), comment_count:post_comments(count)'
 
 type Post = {
   id: string
@@ -21,6 +24,10 @@ type Post = {
   location?: string
   topic?: string
   localLiked?: boolean
+  saves?: { user_id: string }[]
+  comment_count?: { count: number }[]
+  commentCount?: number
+  localSaved?: boolean
 }
 
 const demoPosts: Post[] = [
@@ -86,6 +93,7 @@ export default function App() {
   const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
+  const [openComments, setOpenComments] = useState<string | null>(null)
 
   useEffect(() => {
     if (!supabase) return
@@ -98,7 +106,7 @@ export default function App() {
     if (!supabase) return
     let active = true
     supabase.from('posts')
-      .select('id, content, created_at, user_id, profiles(username, display_name, avatar_url), likes:post_likes(user_id)')
+      .select(POST_SELECT)
       .order('created_at', { ascending: false }).limit(30)
       .then(({ data, error }) => {
         if (!active) return
@@ -121,7 +129,7 @@ export default function App() {
     const term = search.trim().toLowerCase()
     let result = posts
     if (activeFilter === 'Following' && user) result = result.filter((post) => post.user_id === user.id)
-    if (activeNav === 'Saved') result = []
+    if (activeNav === 'Saved') result = result.filter((post) => post.localSaved || post.saves?.some((save) => save.user_id === user?.id))
     if (term) result = result.filter((post) =>
       `${post.content} ${post.profiles?.display_name} ${post.location} ${post.topic}`.toLowerCase().includes(term))
     return result
@@ -144,7 +152,7 @@ export default function App() {
     if (!content) return
     if (!user || !supabase) { setAuthOpen(true); setNotice('Sign in to share with your community.'); return }
     setLoading(true)
-    const { data, error } = await supabase.from('posts').insert({ content }).select('id, content, created_at, user_id, profiles(username, display_name, avatar_url), likes:post_likes(user_id)').single()
+    const { data, error } = await supabase.from('posts').insert({ content }).select(POST_SELECT).single()
     setLoading(false)
     if (error) { setNotice(error.message); return }
     setPosts((current) => [data as unknown as Post, ...current])
@@ -167,6 +175,28 @@ export default function App() {
         : item))
       setNotice(error.message)
     }
+  }
+
+  async function toggleSave(post: Post) {
+    if (post.demo) {
+      setPosts((current) => current.map((item) => item.id === post.id ? { ...item, localSaved: !item.localSaved } : item))
+      setNotice(post.localSaved ? 'Removed from saved.' : 'Saved to your collection.')
+      return
+    }
+    if (!user || !supabase) { setAuthOpen(true); return }
+    const saved = Boolean(post.saves?.some((save) => save.user_id === user.id))
+    const apply = (on: boolean) => setPosts((current) => current.map((item) => item.id === post.id
+      ? { ...item, saves: on ? [...(item.saves ?? []), { user_id: user.id }] : item.saves?.filter((save) => save.user_id !== user.id) }
+      : item))
+    apply(!saved)
+    const { error } = saved
+      ? await supabase.from('post_saves').delete().eq('post_id', post.id).eq('user_id', user.id)
+      : await supabase.from('post_saves').insert({ post_id: post.id })
+    if (error) { apply(saved); setNotice(error.message) } else setNotice(saved ? 'Removed from saved.' : 'Saved to your collection.')
+  }
+
+  function setCommentCount(postId: string, count: number) {
+    setPosts((current) => current.map((item) => item.id === postId ? { ...item, commentCount: count } : item))
   }
 
   async function signOut() {
@@ -269,6 +299,8 @@ export default function App() {
               const liked = Boolean(user && post.likes?.some((like) => like.user_id === user.id))
               const isDemoLiked = post.demo && Boolean(post.localLiked)
               const count = post.likes?.length ?? 0
+              const saved = Boolean(post.localSaved || (user && post.saves?.some((save) => save.user_id === user.id)))
+              const commentTotal = post.commentCount ?? post.comment_count?.[0]?.count ?? (post.demo ? 2 : 0)
               return (
                 <article className="post-card card" key={post.id} style={{ animationDelay: `${index * 70}ms` }}>
                   <div className="post-head">
@@ -284,13 +316,14 @@ export default function App() {
                       if (post.demo) setPosts((current) => current.map((item) => item.id === post.id ? { ...item, likes: isDemoLiked ? item.likes?.filter((like) => like.user_id !== 'local') : [...(item.likes ?? []), { user_id: 'local' }], localLiked: !isDemoLiked } : item))
                       else toggleLike(post)
                     }}><Heart size={17} fill={liked || isDemoLiked ? 'currentColor' : 'none'} /> <span>{count}</span></button>
-                    <button className="post-action" onClick={() => setNotice('Comments are coming soon.')}><MessageCircle size={17} /><span>{post.demo ? Math.max(3, Math.floor(count / 8)) : 0}</span></button>
+                    <button className={`post-action ${openComments === post.id ? 'active-action' : ''}`} aria-expanded={openComments === post.id} onClick={() => setOpenComments(openComments === post.id ? null : post.id)}><MessageCircle size={17} /><span>{commentTotal}</span></button>
                     <button className="post-action share-action" onClick={() => {
                       if (navigator.clipboard) navigator.clipboard.writeText(window.location.href).then(() => setNotice('Link copied to clipboard.')).catch(() => setNotice('Could not copy the link.'))
                       else setNotice('Link sharing is not available in this browser.')
                     }}><ArrowRight size={17} /><span>Share</span></button>
-                    <button className="post-action save-action" aria-label="Save post" onClick={() => setNotice('Sign in to save posts to your collection.')}><Bookmark size={17} /></button>
+                    <button className={`post-action save-action ${saved ? 'saved' : ''}`} aria-label={saved ? 'Unsave post' : 'Save post'} onClick={() => toggleSave(post)}><Bookmark size={17} fill={saved ? 'currentColor' : 'none'} /></button>
                   </div>
+                  {openComments === post.id && <Comments postId={post.id} demo={post.demo} user={user} onCountChange={(total) => setCommentCount(post.id, total)} onNotice={setNotice} onSignIn={() => setAuthOpen(true)} />}
                 </article>
               )
             })}
